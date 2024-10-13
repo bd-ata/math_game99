@@ -5,233 +5,6 @@
     <title>九九乘法表配對遊戲</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f0f0f0;
-        }
-        #game-container {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        #expressions, #answers {
-            width: 300px;
-            margin: 0 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        #expressions .card, #answers .card {
-            width: 200px;
-            height: 50px;
-            background-color: #87CEFA;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px;
-            cursor: pointer;
-            border-radius: 5px;
-            user-select: none;
-            border: none;
-            margin: 5px 0;
-        }
-        .matched {
-            background-color: #32CD32;
-            cursor: default;
-            visibility: hidden;
-        }
-        #timer, #best-time {
-            font-size: 24px;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
-
-<h1>九九乘法表配對遊戲</h1>
-<p>將左側的乘法算式與右側的正確答案配對。</p>
-<div id="timer">時間：<span id="time">0</span> 秒</div>
-<div id="best-time">最佳時間：<span id="best">--</span> 秒</div>
-<div id="game-container">
-    <div id="expressions"></div>
-    <div id="answers"></div>
-</div>
-
-<!-- 音效檔案 -->
-<audio id="correct-sound" src="correct.mp3"></audio>
-<audio id="wrong-sound" src="wrong.mp3"></audio>
-
-<script>
-    let selectedCards = [];
-    const expressionsContainer = document.getElementById('expressions');
-    const answersContainer = document.getElementById('answers');
-    let startTime, timerInterval;
-    let bestTime = localStorage.getItem('bestTime') || '--';
-
-    document.getElementById('best').textContent = bestTime;
-
-    // 生成乘法算式與答案
-    function generateCards() {
-        const expressions = [];
-        const answers = [];
-        const usedPairs = new Set();
-
-        while (expressions.length < 10) { // 總共需要10組配對
-            const a = Math.floor(Math.random() * 9) + 1;
-            const b = Math.floor(Math.random() * 9) + 1;
-            const result = a * b;
-            const pairKey = `${a}x${b}`;
-
-            // 避免重複的算式
-            if (!usedPairs.has(pairKey)) {
-                usedPairs.add(pairKey);
-                expressions.push(`${a} × ${b}`);
-                answers.push(result);
-            }
-        }
-
-        // 將算式和答案分開排列
-        shuffle(expressions);
-        shuffle(answers);
-        return { expressions, answers };
-    }
-
-    // 將數組隨機排列
-    function shuffle(array) {
-        array.sort(() => Math.random() - 0.5);
-    }
-
-    // 初始化遊戲
-    function initGame() {
-        const { expressions, answers } = generateCards();
-
-        expressions.forEach(content => {
-            const cardButton = document.createElement('button');
-            cardButton.classList.add('card');
-            cardButton.textContent = content;
-            cardButton.addEventListener('click', () => selectCard(cardButton, content, 'expression'));
-            expressionsContainer.appendChild(cardButton);
-        });
-
-        answers.forEach(content => {
-            const cardButton = document.createElement('button');
-            cardButton.classList.add('card');
-            cardButton.textContent = content;
-            cardButton.addEventListener('click', () => selectCard(cardButton, content, 'answer'));
-            answersContainer.appendChild(cardButton);
-        });
-
-        startTimer();
-    }
-
-    // 處理點擊事件
-    function selectCard(element, content, type) {
-        if (element.classList.contains('matched') || selectedCards.some(item => item.element === element)) {
-            return;
-        }
-
-        element.style.backgroundColor = '#FFA500';
-        selectedCards.push({ element, content, type });
-
-        if (selectedCards.length === 2) {
-            const first = selectedCards[0];
-            const second = selectedCards[1];
-
-            if (first.type !== second.type && isMatch(first.content, second.content)) {
-                playSound('correct');
-                selectedCards.forEach(item => {
-                    item.element.classList.add('matched');
-                    item.element.textContent = '';
-                });
-                // 檢查是否遊戲結束
-                if (document.querySelectorAll('.card:not(.matched)').length === 0) {
-                    stopTimer();
-                    const currentTime = parseInt(document.getElementById('time').textContent);
-                    setTimeout(() => {
-                        alert('恭喜！你完成了遊戲，總用時：' + currentTime + ' 秒');
-                        // 更新最佳時間
-                        if (bestTime === '--' || currentTime < bestTime) {
-                            bestTime = currentTime;
-                            localStorage.setItem('bestTime', bestTime);
-                            document.getElementById('best').textContent = bestTime;
-                            alert('新的最佳時間！');
-                        }
-                        // 重置遊戲
-                        resetGame();
-                    }, 500);
-                }
-            } else {
-                playSound('wrong');
-                // 如果不匹配，恢復原狀
-                setTimeout(() => {
-                    selectedCards.forEach(item => {
-                        item.element.style.backgroundColor = '#87CEFA';
-                    });
-                    selectedCards = [];
-                }, 500);
-                return;
-            }
-            selectedCards = [];
-        }
-    }
-
-    // 判斷是否匹配
-    function isMatch(content1, content2) {
-        let expression, answer;
-        if (content1.includes('×')) {
-            expression = content1;
-            answer = content2;
-        } else if (content2.includes('×')) {
-            expression = content2;
-            answer = content1;
-        } else {
-            return false;
-        }
-        const [a, b] = expression.split('×').map(num => parseInt(num.trim()));
-        return a * b === parseInt(answer);
-    }
-
-    // 播放音效
-    function playSound(type) {
-        const sound = document.getElementById(type + '-sound');
-        sound.currentTime = 0;
-        sound.play();
-    }
-
-    // 計時器
-    function startTimer() {
-        startTime = Date.now();
-        timerInterval = setInterval(() => {
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            document.getElementById('time').textContent = elapsedTime;
-        }, 1000);
-    }
-
-    function stopTimer() {
-        clearInterval(timerInterval);
-    }
-
-    // 重置遊戲
-    function resetGame() {
-        expressionsContainer.innerHTML = '';
-        answersContainer.innerHTML = '';
-        document.getElementById('time').textContent = '0';
-        selectedCards = [];
-        initGame();
-    }
-
-    initGame();
-</script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <title>九九乘法表配對遊戲</title>
-    <style>
-        body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
             background-color: #f0f0f0;
@@ -257,16 +30,8 @@
         }
 
         #game-container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            margin-top: 20px;
-            padding: 20px;
-        }
-
-        #expressions, #answers {
-            width: 45%;
-            margin: 0 20px;
+            width: 80%;
+            margin: 20px auto;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
@@ -295,6 +60,10 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
+        .selected {
+            background-color: #FFECB3;
+        }
+
         .matched {
             background-color: #A5D6A7;
             cursor: default;
@@ -309,12 +78,7 @@
         /* 手機響應式 */
         @media (max-width: 768px) {
             #game-container {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            #expressions, #answers {
-                width: 80%;
+                width: 100%;
             }
 
             .card {
@@ -329,13 +93,10 @@
 <body>
 
 <h1>九九乘法表配對遊戲</h1>
-<p>將左側的乘法算式與右側的正確答案配對。</p>
+<p>將乘法算式與正確的答案配對。</p>
 <div id="timer">時間：<span id="time">0</span> 秒</div>
 <div id="best-time">最佳時間：<span id="best">--</span> 秒</div>
-<div id="game-container">
-    <div id="expressions"></div>
-    <div id="answers"></div>
-</div>
+<div id="game-container"></div>
 
 <!-- 音效檔案 -->
 <audio id="correct-sound" src="correct.mp3"></audio>
@@ -343,8 +104,7 @@
 
 <script>
     let selectedCards = [];
-    const expressionsContainer = document.getElementById('expressions');
-    const answersContainer = document.getElementById('answers');
+    const gameContainer = document.getElementById('game-container');
     let startTime, timerInterval;
     let bestTime = localStorage.getItem('bestTime') || '--';
 
@@ -366,15 +126,15 @@
             // 避免重複的算式
             if (!usedPairs.has(pairKey)) {
                 usedPairs.add(pairKey);
-                expressions.push(`${a} × ${b}`);
-                answers.push(result);
+                expressions.push({ content: `${a} × ${b}`, type: 'expression' });
+                answers.push({ content: result.toString(), type: 'answer' });
             }
         }
 
-        // 將算式和答案分開排列
-        shuffle(expressions);
-        shuffle(answers);
-        return { expressions, answers };
+        // 合併算式和答案並隨機排列
+        const cards = expressions.concat(answers);
+        shuffle(cards);
+        return cards;
     }
 
     // 將數組隨機排列
@@ -384,45 +144,40 @@
 
     // 初始化遊戲
     function initGame() {
-        const { expressions, answers } = generateCards();
+        const cardsData = generateCards();
 
-        expressions.forEach(content => {
-            const cardButton = document.createElement('div');
-            cardButton.classList.add('card');
-            cardButton.textContent = content;
-            cardButton.addEventListener('click', () => selectCard(cardButton, content, 'expression'));
-            expressionsContainer.appendChild(cardButton);
-        });
-
-        answers.forEach(content => {
-            const cardButton = document.createElement('div');
-            cardButton.classList.add('card');
-            cardButton.textContent = content;
-            cardButton.addEventListener('click', () => selectCard(cardButton, content, 'answer'));
-            answersContainer.appendChild(cardButton);
+        cardsData.forEach(data => {
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('card');
+            cardDiv.textContent = data.content;
+            cardDiv.dataset.type = data.type;
+            cardDiv.dataset.value = data.content;
+            cardDiv.addEventListener('click', () => selectCard(cardDiv));
+            gameContainer.appendChild(cardDiv);
         });
 
         startTimer();
     }
 
     // 處理點擊事件
-    function selectCard(element, content, type) {
-        if (element.classList.contains('matched') || selectedCards.some(item => item.element === element)) {
+    function selectCard(card) {
+        if (card.classList.contains('matched') || selectedCards.includes(card)) {
             return;
         }
 
-        element.style.backgroundColor = '#FFECB3';
-        selectedCards.push({ element, content, type });
+        card.classList.add('selected');
+        selectedCards.push(card);
 
         if (selectedCards.length === 2) {
-            const first = selectedCards[0];
-            const second = selectedCards[1];
+            const [firstCard, secondCard] = selectedCards;
+            const isMatch = checkMatch(firstCard, secondCard);
 
-            if (first.type !== second.type && isMatch(first.content, second.content)) {
+            if (isMatch) {
                 playSound('correct');
                 selectedCards.forEach(item => {
-                    item.element.classList.add('matched');
-                    item.element.textContent = '';
+                    item.classList.add('matched');
+                    item.classList.remove('selected');
+                    item.textContent = '';
                 });
                 // 檢查是否遊戲結束
                 if (document.querySelectorAll('.card:not(.matched)').length === 0) {
@@ -443,10 +198,9 @@
                 }
             } else {
                 playSound('wrong');
-                // 如果不匹配，恢復原狀
                 setTimeout(() => {
                     selectedCards.forEach(item => {
-                        item.element.style.backgroundColor = '#fff';
+                        item.classList.remove('selected');
                     });
                     selectedCards = [];
                 }, 500);
@@ -457,19 +211,27 @@
     }
 
     // 判斷是否匹配
-    function isMatch(content1, content2) {
-        let expression, answer;
-        if (content1.includes('×')) {
-            expression = content1;
-            answer = content2;
-        } else if (content2.includes('×')) {
-            expression = content2;
-            answer = content1;
-        } else {
-            return false;
+    function checkMatch(card1, card2) {
+        const type1 = card1.dataset.type;
+        const type2 = card2.dataset.type;
+        const value1 = card1.dataset.value;
+        const value2 = card2.dataset.value;
+
+        if (type1 === type2) {
+            return false; // 相同類型不匹配
         }
+
+        let expression, answer;
+        if (type1 === 'expression') {
+            expression = value1;
+            answer = parseInt(value2);
+        } else {
+            expression = value2;
+            answer = parseInt(value1);
+        }
+
         const [a, b] = expression.split('×').map(num => parseInt(num.trim()));
-        return a * b === parseInt(answer);
+        return a * b === answer;
     }
 
     // 播放音效
@@ -494,8 +256,7 @@
 
     // 重置遊戲
     function resetGame() {
-        expressionsContainer.innerHTML = '';
-        answersContainer.innerHTML = '';
+        gameContainer.innerHTML = '';
         document.getElementById('time').textContent = '0';
         selectedCards = [];
         initGame();
